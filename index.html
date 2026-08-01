@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Deliveries">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2563eb">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<title>Monthly Delivery Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { overscroll-behavior: none; -webkit-overflow-scrolling: touch; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #f4f5f7;
+    margin: 0;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    color: #222;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: #666; margin-bottom: 20px; font-size: 14px; }
+
+  .controls {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #fff; padding: 14px 18px; border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 10px;
+  }
+  .controls label { font-size: 13px; color: #555; margin-right: 4px; }
+  .controls select, .controls input[type=number], .controls input[type=text] {
+    padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+  }
+  .controls button {
+    padding: 7px 14px; border: none; border-radius: 6px; background: #2563eb;
+    color: #fff; font-size: 14px; cursor: pointer;
+  }
+  .controls button:hover { background: #1d4ed8; }
+  .controls button.secondary { background: #64748b; }
+  .controls button.secondary:hover { background: #475569; }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888;
+    margin: -2px 0 16px 4px;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; flex-shrink: 0;
+  }
+  .status-dot.online { background: #22c55e; }
+  .status-dot.offline { background: #f59e0b; }
+  .status-dot.local { background: #9ca3af; }
+
+  .calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .day-header {
+    text-align: center; font-size: 12px; font-weight: 600; color: #888;
+    padding-bottom: 4px;
+  }
+  .day-cell {
+    background: #fff; border-radius: 8px; min-height: 86px;
+    padding: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .day-cell.empty { background: transparent; box-shadow: none; }
+  .day-num { font-size: 13px; font-weight: 600; color: #444; }
+  .day-cell input[type=number] {
+    width: 100%; margin-top: 6px; padding: 5px 6px; font-size: 14px;
+    border: 1px solid #ddd; border-radius: 6px; text-align: right;
+  }
+  .day-cell input[type=number]:focus { outline: none; border-color: #2563eb; }
+
+  .summary {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  }
+  .summary-card {
+    background: #fff; border-radius: 10px; padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .summary-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .summary-value { font-size: 22px; font-weight: 600; color: #111; }
+  .summary-value.price { color: #2563eb; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+    padding: 20px;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 24px; max-width: 380px; width: 100%;
+  }
+  .modal h2 { font-size: 17px; margin: 0 0 8px; }
+  .modal p { font-size: 13px; color: #666; margin: 0 0 14px; line-height: 1.5; }
+  .modal input { width: 100%; padding: 9px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
+  .modal button { width: 100%; padding: 10px; border: none; border-radius: 6px; background: #2563eb; color: #fff; font-size: 14px; cursor: pointer; }
+
+  @media (max-width: 640px) {
+    .calendar { gap: 4px; }
+    .day-cell { min-height: 64px; padding: 5px; }
+    .summary { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Monthly Delivery Tracker</h1>
+  <div class="subtitle">Enter the quantity delivered on each day. Totals update automatically.</div>
+
+  <div class="controls">
+    <div>
+      <label for="monthSelect">Month</label>
+      <select id="monthSelect"></select>
+    </div>
+    <div>
+      <label for="yearInput">Year</label>
+      <input type="number" id="yearInput" style="width:90px;">
+    </div>
+    <div>
+      <label for="unitPrice">Unit price (₹)</label>
+      <input type="number" id="unitPrice" value="10" min="0" step="0.01" style="width:100px;">
+    </div>
+    <button onclick="buildCalendar()">Go</button>
+    <button class="secondary" onclick="resetQuantities()">Clear quantities</button>
+    <button class="secondary" onclick="exportData()">Export to file</button>
+    <button class="secondary" onclick="document.getElementById('importFile').click()">Import from file</button>
+    <button class="secondary" onclick="openWorkspaceModal()">Workspace</button>
+    <button onclick="openFeedback()" style="background:#16a34a;">💬 Feedback</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+  </div>
+  <div class="status-bar">
+    <span class="status-dot local" id="statusDot"></span>
+    <span id="statusText">Starting…</span>
+  </div>
+
+  <div id="calendar" class="calendar"></div>
+
+  <div class="summary">
+    <div class="summary-card">
+      <div class="summary-label">Total quantity delivered</div>
+      <div class="summary-value" id="totalQty">0</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Unit price</div>
+      <div class="summary-value" id="unitPriceDisplay">₹0.00</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Total amount</div>
+      <div class="summary-value price" id="totalAmount">₹0.00</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="workspaceModal">
+  <div class="modal">
+    <h2>Workspace code</h2>
+    <p>Everyone who should share and see the same data must enter the exact same code here. Treat it like a shared password — anyone with this code can view and edit this workspace's data.</p>
+    <input type="text" id="workspaceInput" placeholder="e.g. vizag-team-2026">
+    <button onclick="saveWorkspaceCode()">Save & reload</button>
+  </div>
+</div>
+
+<!-- Firebase (compat) SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+/* ============ CONFIG — replace with your own Firebase project's config ============ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAFdL2hxRuSRDzxTPp0qd4xy9jPKDS9dVI",
+  authDomain: "grotracker-34d80.firebaseapp.com",
+  projectId: "grotracker-34d80",
+  storageBucket: "grotracker-34d80.firebasestorage.app",
+  messagingSenderId: "147565314497",
+  appId: "1:147565314497:web:249b9d30bd92eb6d406f40",
+  measurementId: "G-FVSR26QF73"
+};
+/* =================================================================================== */
+
+const monthSelect = document.getElementById('monthSelect');
+const yearInput = document.getElementById('yearInput');
+const unitPriceInput = document.getElementById('unitPrice');
+const calendarEl = document.getElementById('calendar');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+monthNames.forEach((m, i) => {
+  const opt = document.createElement('option');
+  opt.value = i; opt.textContent = m;
+  monthSelect.appendChild(opt);
+});
+
+const today = new Date();
+monthSelect.value = today.getMonth();
+yearInput.value = today.getFullYear();
+
+let quantities = {};
+let cloudEnabled = false;
+let db = null;
+let unsubscribe = null;
+let writeTimer = null;
+let applyingRemote = false;
+
+/* ---------- Workspace code ---------- */
+function getWorkspaceCode() {
+  return localStorage.getItem('workspaceCode') || '';
+}
+function openWorkspaceModal() {
+  document.getElementById('workspaceInput').value = getWorkspaceCode();
+  document.getElementById('workspaceModal').classList.remove('hidden');
+}
+function saveWorkspaceCode() {
+  const val = document.getElementById('workspaceInput').value.trim();
+  if (val) localStorage.setItem('workspaceCode', val);
+  else localStorage.removeItem('workspaceCode');
+  location.reload();
+}
+
+/* ---------- Firebase init (only if config has been filled in) ---------- */
+function initCloud() {
+  const configured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+  if (!configured) {
+    setStatus('local', 'Local only — cloud sync not configured yet');
+    return;
+  }
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    cloudEnabled = true;
+    if (!getWorkspaceCode()) {
+      openWorkspaceModal();
+    }
+    trackOpen();
+    window.addEventListener('online', () => setStatus('online', 'Synced'));
+    window.addEventListener('offline', () => setStatus('offline', 'Offline — changes will sync when back online'));
+    setStatus(navigator.onLine ? 'online' : 'offline', navigator.onLine ? 'Synced' : 'Offline — changes will sync when back online');
+  } catch (e) {
+    console.error('Firebase init failed', e);
+    setStatus('local', 'Local only — cloud sync unavailable');
+  }
+}
+
+/* ---------- Lightweight, no-personal-data usage tracking ---------- */
+/* Counts app opens and edit actions only — never stores quantities, prices, or workspace codes. */
+function trackOpen() {
+  if (!cloudEnabled) return;
+  if (sessionStorage.getItem('trackedOpen')) return;
+  sessionStorage.setItem('trackedOpen', '1');
+  db.collection('analytics').doc('usage').set({
+    opens: firebase.firestore.FieldValue.increment(1),
+    lastOpened: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true }).catch(e => console.error('Analytics open write failed', e));
+}
+
+function trackEntry() {
+  if (!cloudEnabled) return;
+  db.collection('analytics').doc('usage').set({
+    entries: firebase.firestore.FieldValue.increment(1)
+  }, { merge: true }).catch(e => console.error('Analytics entry write failed', e));
+}
+
+const FEEDBACK_FORM_URL = "https://forms.gle/czt6BmhERbeRGgWS8";
+function openFeedback() {
+  window.open(FEEDBACK_FORM_URL, '_blank');
+}
+
+function setStatus(kind, text) {
+  statusDot.className = 'status-dot ' + kind;
+  statusText.textContent = text;
+}
+
+function monthDocRef(year, month) {
+  const code = getWorkspaceCode() || 'default';
+  return db.collection('workspaces').doc(code)
+    .collection('months').doc(`${year}-${String(month+1).padStart(2,'0')}`);
+}
+
+/* ---------- Local storage (always used as fallback + fast cache) ---------- */
+function storageKey(year, month) { return `deliveries-${year}-${month}`; }
+function priceKey(year, month) { return `unitprice-${year}-${month}`; }
+
+function loadLocal(year, month) {
+  try {
+    const saved = localStorage.getItem(storageKey(year, month));
+    quantities = saved ? JSON.parse(saved) : {};
+    const savedPrice = localStorage.getItem(priceKey(year, month));
+    if (savedPrice !== null) unitPriceInput.value = savedPrice;
+  } catch (e) { quantities = {}; }
+}
+
+function saveLocal() {
+  const year = parseInt(yearInput.value);
+  const month = parseInt(monthSelect.value);
+  try {
+    localStorage.setItem(storageKey(year, month), JSON.stringify(quantities));
+    localStorage.setItem(priceKey(year, month), unitPriceInput.value);
+  } catch (e) { console.error('Local save failed', e); }
+}
+
+/* ---------- Cloud sync ---------- */
+function subscribeCloud(year, month) {
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  if (!cloudEnabled) return;
+
+  unsubscribe = monthDocRef(year, month).onSnapshot(
+    { includeMetadataChanges: true },
+    (snap) => {
+      const data = snap.data();
+      const fromCache = snap.metadata.fromCache;
+      setStatus(fromCache ? 'offline' : 'online', fromCache ? 'Offline — showing last synced data' : 'Synced');
+      if (!data) return;
+      applyingRemote = true;
+      quantities = data.quantities || {};
+      if (typeof data.unitPrice === 'number' && document.activeElement !== unitPriceInput) {
+        unitPriceInput.value = data.unitPrice;
+      }
+      renderInputsFromState();
+      updateSummary();
+      saveLocal();
+      applyingRemote = false;
+    },
+    (err) => {
+      console.error('Sync error', err);
+      setStatus('offline', 'Sync error — using local data');
+    }
+  );
+}
+
+function pushCloud() {
+  if (!cloudEnabled || applyingRemote) return;
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(() => {
+    const year = parseInt(yearInput.value);
+    const month = parseInt(monthSelect.value);
+    monthDocRef(year, month).set({
+      quantities,
+      unitPrice: parseFloat(unitPriceInput.value) || 0,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).then(trackEntry).catch(e => console.error('Write failed (queued for retry if offline)', e));
+  }, 400);
+}
+
+/* ---------- Rendering ---------- */
+function renderInputsFromState() {
+  document.querySelectorAll('#calendar input[type=number]').forEach(input => {
+    const d = input.dataset.day;
+    if (document.activeElement === input) return; // don't clobber active typing
+    input.value = quantities[d] || '';
+  });
+}
+
+function buildCalendar() {
+  const year = parseInt(yearInput.value);
+  const month = parseInt(monthSelect.value);
+  loadLocal(year, month);
+
+  calendarEl.innerHTML = '';
+  dayNames.forEach(d => {
+    const dh = document.createElement('div');
+    dh.className = 'day-header';
+    dh.textContent = d;
+    calendarEl.appendChild(dh);
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'day-cell empty';
+    calendarEl.appendChild(empty);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = d;
+    cell.appendChild(num);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.placeholder = 'Qty';
+    input.dataset.day = d;
+    input.value = quantities[d] || '';
+    input.addEventListener('input', () => {
+      quantities[d] = parseFloat(input.value) || 0;
+      updateSummary();
+      saveLocal();
+      pushCloud();
+    });
+    cell.appendChild(input);
+
+    calendarEl.appendChild(cell);
+  }
+
+  updateSummary();
+  subscribeCloud(year, month);
+}
+
+function resetQuantities() {
+  quantities = {};
+  saveLocal();
+  pushCloud();
+  buildCalendar();
+}
+
+function updateSummary() {
+  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const price = parseFloat(unitPriceInput.value) || 0;
+  const totalAmount = totalQty * price;
+
+  document.getElementById('totalQty').textContent = totalQty.toLocaleString();
+  document.getElementById('unitPriceDisplay').textContent = '₹' + price.toFixed(2);
+  document.getElementById('totalAmount').textContent = '₹' + totalAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function exportData() {
+  const year = parseInt(yearInput.value);
+  const month = parseInt(monthSelect.value);
+  const price = parseFloat(unitPriceInput.value) || 0;
+  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const payload = {
+    year, month, monthName: monthNames[month],
+    unitPrice: price, quantities, totalQty, totalAmount: totalQty * price
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `deliveries-${year}-${String(month+1).padStart(2,'0')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (typeof data.year === 'number') yearInput.value = data.year;
+      if (typeof data.month === 'number') monthSelect.value = data.month;
+      if (typeof data.unitPrice === 'number') unitPriceInput.value = data.unitPrice;
+      quantities = data.quantities || {};
+      saveLocal();
+      pushCloud();
+      buildCalendar();
+    } catch (err) {
+      alert('Could not read that file. Make sure it is a JSON export from this tool.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+unitPriceInput.addEventListener('input', () => { updateSummary(); saveLocal(); pushCloud(); });
+
+initCloud();
+buildCalendar();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.error('SW registration failed', e));
+  });
+}
+</script>
+</body>
+</html>
