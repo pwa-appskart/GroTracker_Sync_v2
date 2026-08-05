@@ -1,6 +1,6 @@
 {
-  "name": "Monthly Delivery Tracker",
-  "short_name": "MilTrack",
+  "name": "Milk Delivery Tracker",
+  "short_name": "Milk Track",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f5f7",
