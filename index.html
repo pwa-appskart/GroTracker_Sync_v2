@@ -43,7 +43,7 @@
     --shadow: rgba(0,0,0,0.28);
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root[data-theme="dark"] {
       color-scheme: dark;
       --page-bg: #111827;
       --surface: #1f2937;
@@ -229,10 +229,12 @@ function getThemePreference() {
 }
 
 function applyTheme(preference) {
-  if (preference === 'auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.dataset.theme = preference;
+  const resolvedTheme = preference === 'auto'
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : preference;
+  document.documentElement.dataset.theme = resolvedTheme;
   themeToggle.textContent = `Theme: ${preference[0].toUpperCase()}${preference.slice(1)}`;
-  if (themeMeta) themeMeta.content = preference === 'dark' ? '#111827' : '#2563eb';
+  if (themeMeta) themeMeta.content = resolvedTheme === 'dark' ? '#111827' : '#2563eb';
 }
 
 function cycleTheme() {
@@ -244,6 +246,12 @@ function cycleTheme() {
 }
 
 applyTheme(getThemePreference());
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+const handleSystemThemeChange = () => {
+  if (getThemePreference() === 'auto') applyTheme('auto');
+};
+if (systemTheme.addEventListener) systemTheme.addEventListener('change', handleSystemThemeChange);
+else if (systemTheme.addListener) systemTheme.addListener(handleSystemThemeChange);
 
 /* ============ CONFIG — replace with your own Firebase project's config ============ */
 const firebaseConfig = {
