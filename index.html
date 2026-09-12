@@ -183,7 +183,7 @@
     <button class="secondary" onclick="document.getElementById('importFile').click()">Import from file</button>
     <button class="secondary" onclick="openWorkspaceModal()">Workspace</button>
     <button class="secondary theme-toggle" id="themeToggle" onclick="cycleTheme()" aria-label="Switch to dark mode" title="Switch to dark mode">☾</button>
-    <button onclick="openFeedback()" style="background:#16a34a;">💬 Feedback</button>
+    <!-- <button onclick="openFeedback()" style="background:#16a34a;">💬 Feedback</button> -->
     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
   </div>
   <div class="status-bar">
@@ -345,10 +345,10 @@ function trackEntry() {
   }, { merge: true }).catch(e => console.error('Analytics entry write failed', e));
 }
 
-const FEEDBACK_FORM_URL = "https://forms.gle/czt6BmhERbeRGgWS8";
-function openFeedback() {
-  window.open(FEEDBACK_FORM_URL, '_blank');
-}
+//const FEEDBACK_FORM_URL = "https://forms.gle/czt6BmhERbeRGgWS8";
+//  function openFeedback() {
+//  window.open(FEEDBACK_FORM_URL, '_blank');
+//}
 
 function setStatus(kind, text) {
   statusDot.className = 'status-dot ' + kind;
