@@ -68,7 +68,7 @@
     padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
     color: var(--text);
   }
-  .container { max-width: 900px; margin: 0 auto; }
+  .container { max-width: 900px; margin: 0 auto; position: relative; }
   h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
   .subtitle { color: var(--text-muted); margin-bottom: 20px; font-size: 14px; }
 
@@ -89,6 +89,8 @@
   .controls button:hover { background: var(--accent-hover); }
   .controls button.secondary { background: #64748b; }
   .controls button.secondary:hover { background: #475569; }
+  .theme-toggle { position: absolute; top: 0; right: 0; z-index: 110;
+    width: 40px; height: 40px; padding: 0; border: none; border-radius: 50%; font-size: 20px; line-height: 1; }
 
   .status-bar {
     display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-soft);
@@ -180,7 +182,7 @@
     <button class="secondary" onclick="exportData()">Export to file</button>
     <button class="secondary" onclick="document.getElementById('importFile').click()">Import from file</button>
     <button class="secondary" onclick="openWorkspaceModal()">Workspace</button>
-    <button class="secondary" id="themeToggle" onclick="cycleTheme()" aria-label="Change color theme">Theme: Auto</button>
+    <button class="secondary theme-toggle" id="themeToggle" onclick="cycleTheme()" aria-label="Switch to dark mode" title="Switch to dark mode">☾</button>
     <button onclick="openFeedback()" style="background:#16a34a;">💬 Feedback</button>
     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
   </div>
@@ -225,33 +227,26 @@ const themeToggle = document.getElementById('themeToggle');
 const themeMeta = document.querySelector('meta[name="theme-color"]');
 
 function getThemePreference() {
-  return localStorage.getItem('themePreference') || 'auto';
+  return localStorage.getItem('themePreference') === 'dark' ? 'dark' : 'light';
 }
 
 function applyTheme(preference) {
-  const resolvedTheme = preference === 'auto'
-    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : preference;
-  document.documentElement.dataset.theme = resolvedTheme;
-  themeToggle.textContent = `Theme: ${preference[0].toUpperCase()}${preference.slice(1)}`;
-  if (themeMeta) themeMeta.content = resolvedTheme === 'dark' ? '#111827' : '#2563eb';
+  document.documentElement.dataset.theme = preference;
+  const nextMode = preference === 'dark' ? 'light' : 'dark';
+  themeToggle.textContent = preference === 'dark' ? '☀' : '☾';
+  themeToggle.title = `Switch to ${nextMode} mode`;
+  themeToggle.setAttribute('aria-label', `Switch to ${nextMode} mode`);
+  if (themeMeta) themeMeta.content = preference === 'dark' ? '#111827' : '#2563eb';
 }
 
 function cycleTheme() {
-  const preferences = ['auto', 'light', 'dark'];
   const current = getThemePreference();
-  const next = preferences[(preferences.indexOf(current) + 1) % preferences.length];
+  const next = current === 'dark' ? 'light' : 'dark';
   localStorage.setItem('themePreference', next);
   applyTheme(next);
 }
 
 applyTheme(getThemePreference());
-const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
-const handleSystemThemeChange = () => {
-  if (getThemePreference() === 'auto') applyTheme('auto');
-};
-if (systemTheme.addEventListener) systemTheme.addEventListener('change', handleSystemThemeChange);
-else if (systemTheme.addListener) systemTheme.addListener(handleSystemThemeChange);
 
 /* ============ CONFIG — replace with your own Firebase project's config ============ */
 const firebaseConfig = {
