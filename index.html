@@ -507,10 +507,10 @@ function updateSummary() {
 
 /* ---------- WhatsApp share ---------- */
 function shareWhatsApp() {
-  const monthSelect = document.getElementById('monthSelect');
-  const year = parseInt(yearInput.value);
-  const month = parseInt(monthSelect.value);
-  let lines = [`📦 Expense Summary — ${monthNames[month]} ${year}`];
+  // const monthSelect = document.getElementById('monthSelect');
+  // const year = parseInt(yearInput.value);
+  // const month = parseInt(monthSelect.value); — ${monthNames[month]} ${year}
+  let lines = [`📦 Expense Summary `];
   // Object.entries(byCategory).forEach(([cat, amt]) => lines.push(`${cat}: ₹${amt.toFixed(2)}`));
   lines.push(`Total Quantity: ₹${totalQty.toFixed(2)}`);
   lines.push(`Total Amount: ₹${totalAmount.toFixed(2)}`);
