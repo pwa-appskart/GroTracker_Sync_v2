@@ -507,19 +507,9 @@ function updateSummary() {
 
 /* ---------- WhatsApp share ---------- */
 function shareWhatsApp() {
-  /*const year = parseInt(yearInput.value), month = parseInt(monthSelect.value);
-  const byCategory = {};
-  let grandTotal = 0;
-  Object.entries(monthEntries).forEach(([day, list]) => {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    list.forEach(e => {
-      const item = items.find(i => i.id === e.itemId);
-      const cat = item ? item.category : 'Unknown';
-      const amt = entryAmount(e, dateStr);
-      byCategory[cat] = (byCategory[cat] || 0) + amt;
-      grandTotal += amt;
-    });
-  });*/
+  const monthSelect = document.getElementById('monthSelect');
+  const year = parseInt(yearInput.value);
+  const month = parseInt(monthSelect.value);
   let lines = [`📦 Expense Summary — ${monthNames[month]} ${year}`];
   // Object.entries(byCategory).forEach(([cat, amt]) => lines.push(`${cat}: ₹${amt.toFixed(2)}`));
   lines.push(`Total Quantity: ₹${totalQty.toFixed(2)}`);
