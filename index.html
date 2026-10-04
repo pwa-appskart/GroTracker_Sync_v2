@@ -515,9 +515,9 @@ function shareWhatsApp() {
   const price = parseFloat(unitPriceInput.value) || 0;
   const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
   const totalAmount = totalQty * price;
-  let lines = [`📦 Expense Summary `,{month}];
+  let lines = [`📦 Expense Summary ${monthNames[month]} ${year}`];
   // Object.entries(byCategory).forEach(([cat, amt]) => lines.push(`${cat}: ₹${amt.toFixed(2)}`));
-  lines.push(`Total Quantity: ₹${totalQty}`);
+  lines.push(`Total Quantity: ₹${totalQty} Ltrs`);
   lines.push(`Total Amount: ₹${totalAmount}`);
   const text = lines.join('\n');
 
