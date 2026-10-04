@@ -413,8 +413,8 @@ function subscribeCloud(year, month) {
   );
 }
 
-function pushCloud() {
-  if (!cloudEnabled || applyingRemote) return;
+function pushCloud() {  
+  /*if (!cloudEnabled || applyingRemote) return;
   clearTimeout(writeTimer);
   writeTimer = setTimeout(() => {
     const year = parseInt(yearInput.value);
@@ -424,7 +424,27 @@ function pushCloud() {
       unitPrice: parseFloat(unitPriceInput.value) || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).then(trackEntry).catch(e => console.error('Write failed (queued for retry if offline)', e));
+  }, 400);*/
+   if (!cloudEnabled || applyingRemote) return;
+  // Snapshot the data NOW, not when the debounced write fires 400ms later. Without
+  // this, a real-time listener update arriving during that window (e.g. a stale
+  // cached snapshot reflecting the value BEFORE this edit) can overwrite the live
+  // `quantities` object first — and the write would then fire with that overwritten
+  // (stale) value instead of what you actually just typed. This was exactly why an
+  // entered 1.5 could get silently replaced by an old "1" and persisted that way.
+  const year = parseInt(yearInput.value);
+  const month = parseInt(monthSelect.value);
+  const quantitiesSnapshot = JSON.parse(JSON.stringify(quantities));
+  const priceSnapshot = parseFloat(unitPriceInput.value) || 0;
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(() => {
+    monthDocRef(year, month).set({
+      quantities: quantitiesSnapshot,
+      unitPrice: priceSnapshot,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).then(trackEntry).catch(e => console.error('Write failed (queued for retry if offline)', e));
   }, 400);
+
 }
 
 /* ---------- Rendering ---------- */
@@ -507,9 +527,6 @@ function updateSummary() {
 
 /* ---------- WhatsApp share ---------- */
 function shareWhatsApp() {
-  // const monthSelect = document.getElementById('monthSelect');
-  // const year = parseInt(yearInput.value);
-  // const month = parseInt(monthSelect.value); — ${monthNames[month]} ${year}
   const year = parseInt(yearInput.value);
   const month = parseInt(monthSelect.value);
   const price = parseFloat(unitPriceInput.value) || 0;
