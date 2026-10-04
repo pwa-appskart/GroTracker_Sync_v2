@@ -510,7 +510,12 @@ function shareWhatsApp() {
   // const monthSelect = document.getElementById('monthSelect');
   // const year = parseInt(yearInput.value);
   // const month = parseInt(monthSelect.value); — ${monthNames[month]} ${year}
-  let lines = [`📦 Expense Summary `];
+  const year = parseInt(yearInput.value);
+  const month = parseInt(monthSelect.value);
+  const price = parseFloat(unitPriceInput.value) || 0;
+  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const totalAmount = totalQty * price;
+  let lines = [`📦 Expense Summary `,{month}];
   // Object.entries(byCategory).forEach(([cat, amt]) => lines.push(`${cat}: ₹${amt.toFixed(2)}`));
   lines.push(`Total Quantity: ₹${totalQty}`);
   lines.push(`Total Amount: ₹${totalAmount}`);
