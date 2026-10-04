@@ -512,8 +512,8 @@ function shareWhatsApp() {
   // const month = parseInt(monthSelect.value); — ${monthNames[month]} ${year}
   let lines = [`📦 Expense Summary `];
   // Object.entries(byCategory).forEach(([cat, amt]) => lines.push(`${cat}: ₹${amt.toFixed(2)}`));
-  lines.push(`Total Quantity: ₹${totalQty.toFixed(2)}`);
-  lines.push(`Total Amount: ₹${totalAmount.toFixed(2)}`);
+  lines.push(`Total Quantity: ₹${totalQty}`);
+  lines.push(`Total Amount: ₹${totalAmount}`);
   const text = lines.join('\n');
 
   if (navigator.share) navigator.share({ text }).catch(() => {});
