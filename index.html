@@ -394,12 +394,24 @@ function storageKey(year, month) { return `deliveries-${year}-${month}`; }
 function priceKey(year, month) { return `unitprice-${year}-${month}`; }
 function noDeliveryKey(year, month) { return `nodeliveries-${year}-${month}`; }
 
+function removeNoDeliveryQuantities() {
+  let changed = false;
+  Object.keys(noDeliveries).forEach(day => {
+    if (noDeliveries[day] && Object.prototype.hasOwnProperty.call(quantities, day)) {
+      delete quantities[day];
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function loadLocal(year, month) {
   try {
     const saved = localStorage.getItem(storageKey(year, month));
     quantities = saved ? JSON.parse(saved) : {};
     const savedNoDeliveries = localStorage.getItem(noDeliveryKey(year, month));
     noDeliveries = savedNoDeliveries ? JSON.parse(savedNoDeliveries) : {};
+    removeNoDeliveryQuantities();
     const savedPrice = localStorage.getItem(priceKey(year, month));
     if (savedPrice !== null) unitPriceInput.value = savedPrice;
   } catch (e) { quantities = {}; noDeliveries = {}; }
@@ -430,6 +442,7 @@ function subscribeCloud(year, month) {
       applyingRemote = true;
       quantities = data.quantities || {};
       noDeliveries = data.noDeliveries || {};
+      const hadStaleNoDeliveryQuantities = removeNoDeliveryQuantities();
       if (typeof data.unitPrice === 'number' && document.activeElement !== unitPriceInput) {
         unitPriceInput.value = data.unitPrice;
       }
@@ -437,6 +450,7 @@ function subscribeCloud(year, month) {
       updateSummary();
       saveLocal();
       applyingRemote = false;
+      if (hadStaleNoDeliveryQuantities) pushCloud();
     },
     (err) => {
       console.error('Sync error', err);
@@ -598,7 +612,7 @@ function resetQuantities() {
 }
 
 function updateSummary() {
-  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const totalQty = getTotalQuantity();
   const price = parseFloat(unitPriceInput.value) || 0;
   const totalAmount = totalQty * price;
 
@@ -612,7 +626,7 @@ function shareWhatsApp() {
   const year = parseInt(yearInput.value);
   const month = parseInt(monthSelect.value);
   const price = parseFloat(unitPriceInput.value) || 0;
-  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const totalQty = getTotalQuantity();
   const totalAmount = totalQty * price;
   let lines = [`📦 Expense Summary: ${monthNames[month]}, ${year}`];
   // Object.entries(byCategory).forEach(([cat, amt]) => lines.push(`${cat}: ₹${amt.toFixed(2)}`));
@@ -623,11 +637,18 @@ function shareWhatsApp() {
   if (navigator.share) navigator.share({ text }).catch(() => {});
   else navigator.clipboard.writeText(text).then(() => alert('Summary copied — paste it into WhatsApp.')).catch(() => alert(text));
 }
+function getTotalQuantity() {
+  return Object.entries(quantities).reduce((total, [day, quantity]) => {
+    if (noDeliveries[day]) return total;
+    const value = Number(quantity);
+    return total + (Number.isFinite(value) ? value : 0);
+  }, 0);
+}
 function exportData() {
   const year = parseInt(yearInput.value);
   const month = parseInt(monthSelect.value);
   const price = parseFloat(unitPriceInput.value) || 0;
-  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const totalQty = getTotalQuantity();
   const payload = {
     year, month, monthName: monthNames[month],
     unitPrice: price, quantities, noDeliveries, totalQty, totalAmount: totalQty * price
@@ -653,6 +674,7 @@ function importData(event) {
       if (typeof data.unitPrice === 'number') unitPriceInput.value = data.unitPrice;
       quantities = data.quantities || {};
       noDeliveries = data.noDeliveries || {};
+      removeNoDeliveryQuantities();
       saveLocal();
       pushCloud();
       buildCalendar();
