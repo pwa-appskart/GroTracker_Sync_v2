@@ -1,4 +1,4 @@
-const CACHE_NAME = 'delivery-tracker-v3-theme';
+const CACHE_NAME = 'delivery-tracker-v4-no-delivery-sync';
 const ASSETS = [
   './index.html',
   './manifest.json',

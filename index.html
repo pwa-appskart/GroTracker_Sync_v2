@@ -313,6 +313,9 @@ let db = null;
 let unsubscribe = null;
 let writeTimer = null;
 let applyingRemote = false;
+let cloudWriteRevision = 0;
+let cloudWritePending = false;
+let pendingCloudMonth = null;
 
 /* ---------- Workspace code ---------- */
 function getWorkspaceCode() {
@@ -438,7 +441,7 @@ function subscribeCloud(year, month) {
       const data = snap.data();
       const fromCache = snap.metadata.fromCache;
       setStatus(fromCache ? 'offline' : 'online', fromCache ? 'Offline — showing last synced data' : 'Synced');
-      if (!data) return;
+      if (!data || (cloudWritePending && pendingCloudMonth === `${year}-${month}`)) return;
       applyingRemote = true;
       quantities = data.quantities || {};
       noDeliveries = data.noDeliveries || {};
@@ -459,38 +462,31 @@ function subscribeCloud(year, month) {
   );
 }
 
-function pushCloud() {  
-  /*if (!cloudEnabled || applyingRemote) return;
-  clearTimeout(writeTimer);
-  writeTimer = setTimeout(() => {
-    const year = parseInt(yearInput.value);
-    const month = parseInt(monthSelect.value);
-    monthDocRef(year, month).set({
-      quantities,
-      unitPrice: parseFloat(unitPriceInput.value) || 0,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).then(trackEntry).catch(e => console.error('Write failed (queued for retry if offline)', e));
-  }, 400);*/
-   if (!cloudEnabled || applyingRemote) return;
-  // Snapshot the data NOW, not when the debounced write fires 400ms later. Without
-  // this, a real-time listener update arriving during that window (e.g. a stale
-  // cached snapshot reflecting the value BEFORE this edit) can overwrite the live
-  // `quantities` object first — and the write would then fire with that overwritten
-  // (stale) value instead of what you actually just typed. This was exactly why an
-  // entered 1.5 could get silently replaced by an old "1" and persisted that way.
+function pushCloud() {
+  if (!cloudEnabled || applyingRemote) return;
   const year = parseInt(yearInput.value);
   const month = parseInt(monthSelect.value);
   const quantitiesSnapshot = JSON.parse(JSON.stringify(quantities));
   const noDeliveriesSnapshot = JSON.parse(JSON.stringify(noDeliveries));
   const priceSnapshot = parseFloat(unitPriceInput.value) || 0;
+  const revision = ++cloudWriteRevision;
+  cloudWritePending = true;
+  pendingCloudMonth = `${year}-${month}`;
   clearTimeout(writeTimer);
   writeTimer = setTimeout(() => {
+    // Replace the month document so removed quantity and no-delivery keys stay deleted.
     monthDocRef(year, month).set({
       quantities: quantitiesSnapshot,
       noDeliveries: noDeliveriesSnapshot,
       unitPrice: priceSnapshot,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).then(trackEntry).catch(e => console.error('Write failed (queued for retry if offline)', e));
+    }).then(() => {
+      trackEntry();
+      if (revision === cloudWriteRevision) cloudWritePending = false;
+    }).catch(e => {
+      if (revision === cloudWriteRevision) cloudWritePending = false;
+      console.error('Write failed (queued for retry if offline)', e);
+    });
   }, 400);
 
 }
