@@ -26,6 +26,10 @@
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
     --shadow: rgba(0,0,0,0.08);
+    --qty-placeholder: #b6beca;
+    --day-missing: #fff7ed;
+    --day-missing-border: #fdba74;
+    --day-today: #eff6ff;
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
@@ -41,6 +45,10 @@
     --accent: #60a5fa;
     --accent-hover: #93c5fd;
     --shadow: rgba(0,0,0,0.28);
+    --qty-placeholder: #64748b;
+    --day-missing: #332b25;
+    --day-missing-border: #9a5c2e;
+    --day-today: #1e3a5f;
   }
   @media (prefers-color-scheme: dark) {
     :root[data-theme="dark"] {
@@ -57,6 +65,10 @@
       --accent: #60a5fa;
       --accent-hover: #93c5fd;
       --shadow: rgba(0,0,0,0.28);
+      --qty-placeholder: #64748b;
+      --day-missing: #332b25;
+      --day-missing-border: #9a5c2e;
+      --day-today: #1e3a5f;
     }
   }
   * { box-sizing: border-box; }
@@ -105,7 +117,7 @@
 
   .calendar {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 8px;
     margin-bottom: 20px;
   }
@@ -115,17 +127,23 @@
   }
   .day-cell {
     background: var(--surface); border-radius: 8px; min-height: 86px;
-    padding: 8px; box-shadow: 0 1px 2px var(--shadow);
+    padding: 8px; box-shadow: 0 1px 2px var(--shadow); border: 1px solid transparent;
     display: flex; flex-direction: column; justify-content: space-between;
   }
   .day-cell.empty { background: transparent; box-shadow: none; }
+  .day-cell.today { background: var(--day-today); border-color: var(--accent); }
+  .day-cell.missing-quantity { background: var(--day-missing); border-color: var(--day-missing-border); }
   .day-num { font-size: 13px; font-weight: 600; color: var(--text-muted); }
   .day-cell input[type=number] {
-    width: 100%; margin-top: 6px; padding: 5px 6px; font-size: 14px;
+    width: 100%; min-width: 0; margin-top: 6px; padding: 5px 6px; font-size: 14px;
     border: 1px solid var(--border-soft); border-radius: 6px; text-align: right;
     background: var(--surface); color: var(--text);
   }
+  .day-cell input[type=number]::placeholder { color: var(--qty-placeholder); opacity: 1; }
   .day-cell input[type=number]:focus { outline: none; border-color: #2563eb; }
+  .no-delivery-label { display: flex; align-items: center; gap: 4px; margin-top: 5px;
+    color: var(--text-soft); font-size: 10px; cursor: pointer; }
+  .no-delivery-label input { margin: 0; accent-color: var(--accent); cursor: pointer; }
 
   .summary {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
@@ -153,8 +171,16 @@
   .modal button { width: 100%; padding: 10px; border: none; border-radius: 6px; background: var(--accent); color: #fff; font-size: 14px; cursor: pointer; }
 
   @media (max-width: 640px) {
-    .calendar { gap: 4px; }
-    .day-cell { min-height: 64px; padding: 5px; }
+    body { padding-inline: 8px; }
+    .calendar { gap: 2px; }
+    .day-cell { min-height: 116px; padding: 5px 3px; }
+    .day-cell input[type=number] { padding: 5px 2px; font-size: 16px; }
+    .no-delivery-label {
+      min-height: 44px; margin: 2px -1px 0; padding: 3px 1px;
+      flex-direction: column; justify-content: center; gap: 2px;
+      text-align: center; font-size: 9px; line-height: 1.1;
+    }
+    .no-delivery-label input { width: 18px; height: 18px; flex: 0 0 18px; }
     .summary { grid-template-columns: 1fr; }
   }
 </style>
@@ -162,7 +188,7 @@
 <body>
 <div class="container">
   <h1>Milk Delivery Tracker</h1>
-  <div class="subtitle">Enter the quantity delivered on each day. Totals update automatically.</div>
+  <div class="subtitle">Enter each day's quantity or mark “No delivery”. Past days without a quantity are highlighted.</div>
 
   <div class="controls">
     <div>
@@ -281,6 +307,7 @@ monthSelect.value = today.getMonth();
 yearInput.value = today.getFullYear();
 
 let quantities = {};
+let noDeliveries = {};
 let cloudEnabled = false;
 let db = null;
 let unsubscribe = null;
@@ -365,14 +392,17 @@ function monthDocRef(year, month) {
 /* ---------- Local storage (always used as fallback + fast cache) ---------- */
 function storageKey(year, month) { return `deliveries-${year}-${month}`; }
 function priceKey(year, month) { return `unitprice-${year}-${month}`; }
+function noDeliveryKey(year, month) { return `nodeliveries-${year}-${month}`; }
 
 function loadLocal(year, month) {
   try {
     const saved = localStorage.getItem(storageKey(year, month));
     quantities = saved ? JSON.parse(saved) : {};
+    const savedNoDeliveries = localStorage.getItem(noDeliveryKey(year, month));
+    noDeliveries = savedNoDeliveries ? JSON.parse(savedNoDeliveries) : {};
     const savedPrice = localStorage.getItem(priceKey(year, month));
     if (savedPrice !== null) unitPriceInput.value = savedPrice;
-  } catch (e) { quantities = {}; }
+  } catch (e) { quantities = {}; noDeliveries = {}; }
 }
 
 function saveLocal() {
@@ -380,6 +410,7 @@ function saveLocal() {
   const month = parseInt(monthSelect.value);
   try {
     localStorage.setItem(storageKey(year, month), JSON.stringify(quantities));
+    localStorage.setItem(noDeliveryKey(year, month), JSON.stringify(noDeliveries));
     localStorage.setItem(priceKey(year, month), unitPriceInput.value);
   } catch (e) { console.error('Local save failed', e); }
 }
@@ -398,6 +429,7 @@ function subscribeCloud(year, month) {
       if (!data) return;
       applyingRemote = true;
       quantities = data.quantities || {};
+      noDeliveries = data.noDeliveries || {};
       if (typeof data.unitPrice === 'number' && document.activeElement !== unitPriceInput) {
         unitPriceInput.value = data.unitPrice;
       }
@@ -435,11 +467,13 @@ function pushCloud() {
   const year = parseInt(yearInput.value);
   const month = parseInt(monthSelect.value);
   const quantitiesSnapshot = JSON.parse(JSON.stringify(quantities));
+  const noDeliveriesSnapshot = JSON.parse(JSON.stringify(noDeliveries));
   const priceSnapshot = parseFloat(unitPriceInput.value) || 0;
   clearTimeout(writeTimer);
   writeTimer = setTimeout(() => {
     monthDocRef(year, month).set({
       quantities: quantitiesSnapshot,
+      noDeliveries: noDeliveriesSnapshot,
       unitPrice: priceSnapshot,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).then(trackEntry).catch(e => console.error('Write failed (queued for retry if offline)', e));
@@ -451,8 +485,29 @@ function pushCloud() {
 function renderInputsFromState() {
   document.querySelectorAll('#calendar input[type=number]').forEach(input => {
     const d = input.dataset.day;
+    if (noDeliveries[d]) {
+      input.value = '';
+      return;
+    }
     if (document.activeElement === input) return; // don't clobber active typing
-    input.value = quantities[d] || '';
+    input.value = Object.prototype.hasOwnProperty.call(quantities, d) ? quantities[d] : '';
+  });
+  document.querySelectorAll('#calendar input[type=checkbox]').forEach(input => {
+    const d = input.dataset.day;
+    input.checked = !!noDeliveries[d];
+    const qtyInput = document.querySelector(`#calendar input[type=number][data-day="${d}"]`);
+    qtyInput.disabled = input.checked;
+  });
+  document.querySelectorAll('#calendar .day-cell:not(.empty)').forEach(cell => {
+    const d = Number(cell.dataset.day);
+    const year = parseInt(yearInput.value);
+    const month = parseInt(monthSelect.value);
+    const now = new Date();
+    const isToday = year === now.getFullYear() && month === now.getMonth() && d === now.getDate();
+    const isPast = new Date(year, month, d) < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const hasQuantity = Number.isFinite(Number(quantities[d])) && Number(quantities[d]) > 0;
+    cell.classList.toggle('today', isToday);
+    cell.classList.toggle('missing-quantity', isPast && !hasQuantity && !noDeliveries[d]);
   });
 }
 
@@ -481,6 +536,7 @@ function buildCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const cell = document.createElement('div');
     cell.className = 'day-cell';
+    cell.dataset.day = d;
 
     const num = document.createElement('div');
     num.className = 'day-num';
@@ -492,24 +548,50 @@ function buildCalendar() {
     input.min = '0';
     input.placeholder = 'Qty';
     input.dataset.day = d;
-    input.value = quantities[d] || '';
+    input.value = Object.prototype.hasOwnProperty.call(quantities, d) ? quantities[d] : '';
     input.addEventListener('input', () => {
-      quantities[d] = parseFloat(input.value) || 0;
+      if (input.value === '') delete quantities[d];
+      else quantities[d] = parseFloat(input.value) || 0;
+      renderInputsFromState();
       updateSummary();
       saveLocal();
       pushCloud();
     });
     cell.appendChild(input);
 
+    const noDeliveryLabel = document.createElement('label');
+    noDeliveryLabel.className = 'no-delivery-label';
+    const noDeliveryInput = document.createElement('input');
+    noDeliveryInput.type = 'checkbox';
+    noDeliveryInput.dataset.day = d;
+    noDeliveryInput.setAttribute('aria-label', `No delivery on day ${d}`);
+    noDeliveryInput.checked = !!noDeliveries[d];
+    noDeliveryInput.addEventListener('change', () => {
+      if (noDeliveryInput.checked) {
+        noDeliveries[d] = true;
+        delete quantities[d];
+      } else {
+        delete noDeliveries[d];
+      }
+      renderInputsFromState();
+      updateSummary();
+      saveLocal();
+      pushCloud();
+    });
+    noDeliveryLabel.append(noDeliveryInput, document.createTextNode('No delivery'));
+    cell.appendChild(noDeliveryLabel);
+
     calendarEl.appendChild(cell);
   }
 
+  renderInputsFromState();
   updateSummary();
   subscribeCloud(year, month);
 }
 
 function resetQuantities() {
   quantities = {};
+  noDeliveries = {};
   saveLocal();
   pushCloud();
   buildCalendar();
@@ -548,7 +630,7 @@ function exportData() {
   const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
   const payload = {
     year, month, monthName: monthNames[month],
-    unitPrice: price, quantities, totalQty, totalAmount: totalQty * price
+    unitPrice: price, quantities, noDeliveries, totalQty, totalAmount: totalQty * price
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -570,6 +652,7 @@ function importData(event) {
       if (typeof data.month === 'number') monthSelect.value = data.month;
       if (typeof data.unitPrice === 'number') unitPriceInput.value = data.unitPrice;
       quantities = data.quantities || {};
+      noDeliveries = data.noDeliveries || {};
       saveLocal();
       pushCloud();
       buildCalendar();
